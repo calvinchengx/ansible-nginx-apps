@@ -1,0 +1,38 @@
+server {
+    server_name www.{{ site_name }};
+    rewrite ^(.*) http://{{ site_name }}$1 permanent;
+}
+
+server {
+
+    listen       80;
+    server_name  {{ site_name }};
+
+    access_log /var/log/nginx/{{ site_name }}_access.log;
+    error_log /var/log/nginx/{{ site_name }}_error.log;
+
+    location / {
+        root   /srv/http/{{ project_name }}/html;
+        index  index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /js/ {
+        alias /srv/http/{{ project_name }}/js/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+    location /css/ {
+        alias /srv/http/{{ project_name }}/css/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+    location /img/ {
+        alias /srv/http/{{ project_name }}/img/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+}

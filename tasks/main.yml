@@ -1,0 +1,75 @@
+---
+# site_type, site_name, project_name, sudo_user, local_dev
+- name: Create nginx site given site_type and site_name
+  sudo: true
+  template: src=../templates/{{ site_type }}_{{ protocol }}.conf.j2 dest=/etc/nginx/sites-available/{{ site_name }}.conf
+  when: site_type is defined and protocol is defined and site_name is defined
+
+- name: Create ssl directory if protocol is https
+  sudo: true
+  file: path=/etc/nginx/ssl/{{ site_name }} state=directory
+  when: protocol == "https"
+
+- name: Move ssl certs to the server
+  sudo: true
+  synchronize: src=files/ssl/{{ site_name }} dest=/etc/nginx/ssl/{{ site_name }}
+  when: protocol == "https"
+
+- name: Elevate /srv/http perms
+  sudo: true
+  command: sudo chmod 777 /srv/http 
+
+- name: Create nginx site directory where app source code resides
+  sudo: true
+  file: path=/srv/http/{{ project_name }} state=directory mode=755 recurse=yes owner={{ sudo_user|default(deploy) }} group={{ sudo_user|default(deploy) }}
+  when: project_name is defined
+
+- name: Retrieve our aa_api source code in our host machine as archive.tar
+  sudo: false 
+  local_action: command git archive master --format=tar --remote={{ git_repo }} --output=archive.tar
+
+- name: Compress archive.tar (into archive.tar.gz)
+  sudo: false 
+  local_action: command gzip -f archive.tar
+
+- name: Send archive.tar.gz into our vm and unpack it
+  sudo: true
+  unarchive: src=archive.tar.gz dest=/srv/http/{{ project_name }}
+
+- name: Clean up archive.tar.gz in our host machine
+  sudo: false
+  local_action: command rm archive.tar.gz
+
+- name: Reduce /srv/http perms
+  sudo: true
+  command: sudo chmod 755 /srv/http 
+
+- name: Enable the newly created site
+  sudo: true
+  file: src=/etc/nginx/sites-available/{{ site_name }}.conf dest=/etc/nginx/sites-enabled/{{ site_name }}.conf state=link
+  when: site_type is defined and site_name is defined and project_name is defined
+
+- name: Elevate /etc/hosts perms
+  sudo: true
+  command: sudo chmod 777 /etc/hosts
+
+- name: Elevate /etc perms
+  sudo: true
+  command: sudo chmod 777 /etc
+
+- name: Set /etc/hosts so it recognizes a local-only site
+  sudo: true
+  lineinfile: dest=/etc/hosts state=present line="{{ local_dev }} {{ site_name }}" 
+  when: local_dev is defined
+
+- name: Reduce /etc/hosts perms
+  sudo: true
+  command: sudo chmod 644 /etc/hosts
+
+- name: Reduce /etc perms
+  sudo: true
+  command: sudo chmod 755 /etc
+
+- name: Update host machine's /etc/hosts
+  local_action: command sudo sh -c "grep -q -F '{{ local_dev }} {{ site_name }}' /etc/hosts || echo '{{ local_dev }} {{ site_name }}' >> /etc/hosts"
+

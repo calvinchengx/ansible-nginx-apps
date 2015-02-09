@@ -1,0 +1,44 @@
+server {
+    listen  80;
+    server_name  {{ site_name }};
+    rewrite ^ https://$server_name$request_uri? permanent;
+}
+
+server {
+
+    listen       443;
+    server_name  {{ site_name }};
+
+    ssl on;
+    ssl_certificate /etc/nginx/ssl/server.pem;
+    ssl_certificate_key /etc/nginx/ssl/server.key;
+
+    access_log /var/log/nginx/{{ site_name }}_access.log;
+    error_log /var/log/nginx/{{ site_name }}_error.log;
+
+
+    location / {
+        root   /srv/http/{{ project_name }}/html;
+        index  index.html index.htm;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /js/ {
+        alias /srv/http/{{ project_name }}/js/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+    location /css/ {
+        alias /srv/http/{{ project_name }}/css/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+    location /img/ {
+        alias /srv/http/{{ project_name }}/img/;
+        error_page 404 = /404;
+        expires 30d;
+    }
+
+}
